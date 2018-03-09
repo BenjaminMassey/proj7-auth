@@ -7,7 +7,7 @@ import time
 # app = Flask(__name__)
 # app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
 
-def generate_auth_token(expiration=600):
+def generate_auth_token(expiration):
    # s = Serializer(app.config['SECRET_KEY'], expires_in=expiration)
    s = Serializer('test1234@#$', expires_in=expiration)
    # pass index of user
@@ -26,5 +26,5 @@ def verify_auth_token(token):
 if __name__ == "__main__":
     t = generate_auth_token(10)
     for i in range(1, 20):
-	print verify_auth_token(t)
-        time.sleep(1)
+       print(verify_auth_token(t))
+       time.sleep(1)
