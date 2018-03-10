@@ -54,14 +54,15 @@
 
 </br>
 <p>
-	<label>Username:</label>
+	<label id="unl">Username:</label>
 	</br>
 	<input type=text name="username" id="username" value="" />
 	</br>
-	<label>Password:</label>
+	<label id="pwl">Password:</label>
 	</br>
 	<input type="password" name="password" id="password" value="" />
 	</br>
+	<input id="loginButton" type="button" value="Login" onclick="login_user()" />
 	<input id="registerUser" type="button" value="Register New User" onclick="register_user();") />
 	</br>
 	<input id="testToken" type="button" value="Test Auth Token" onclick="test_auth_token();") />
@@ -154,6 +155,7 @@
   var LISTALL_URL = SCRIPT_ROOT + "/listAll";
   var LISTCLOSE_URL = SCRIPT_ROOT + "/listCloseOnly";
   var LISTOPEN_URL = SCRIPT_ROOT + "/listOpenOnly";
+  var RECEIVE_TOKEN_URL = SCRIPT_ROOT + "/api/token/receive";
 
   // Pass calctimes a <td> element containing the data for a control.
   // It extracts the distance and calls the server to get times to
@@ -318,6 +320,14 @@
 		if (answer.message != "") {
 			userResultField.value = answer.message;
 		}
+		else {
+			usernameField.style.display = 'none';
+			passwordField.style.display = 'none';
+			document.getElementById("unl").style.display = 'none';
+			document.getElementById("pwl").style.display = 'none';
+			document.getElementById("loginButton").style.display = 'none';
+			document.getElementById("registerUser").style.display = 'none';
+		}
 	  }
 	);
   }
@@ -345,11 +355,46 @@
 	);
   }
   
-  function list_all() {
+  function login_user() {
 	var usernameField = document.getElementById("username");
 	var username = usernameField.value;
 	var passwordField = document.getElementById("password");
 	var password = passwordField.value;
+	var userResultField = document.getElementById("userResult");
+	
+	$.getJSON(RECEIVE_TOKEN_URL, 
+		{ 
+			username: username,
+			password: password
+		}, 
+      // response handler
+      function(data) {
+		var answer = data.result;
+		if (answer.success == "yes") {
+			userResultField.value = "Succesfully logged in as " + username;
+			usernameField.style.display = 'none';
+			passwordField.style.display = 'none';
+			document.getElementById("unl").style.display = 'none';
+			document.getElementById("pwl").style.display = 'none';
+			document.getElementById("loginButton").style.display = 'none';
+			document.getElementById("registerUser").style.display = 'none';
+		}
+		else if (answer.success == "no") {
+			userResultField.value = "Failed to login... Check your credentials.";
+		}
+		else {
+			userResultField.value = "Got a strange response on login...?";
+		}
+	  }
+	);
+	
+  }
+  
+  function list_all() {
+	var usernameField = document.getElementById("username");
+	var username = usernameField.value;
+	//var passwordField = document.getElementById("password");
+	//var password = passwordField.value;
 	var addition = "";
 	if (document.getElementById("jsonR").checked) {
 		addition = "/json"
@@ -357,11 +402,12 @@
 	else {
 		addition = "/csv"
 	}
-
+	//var token = '<%= Session["token"] %>';
 	$.getJSON(LISTALL_URL + addition, 
 		{ 
-			username: username,
-			password: password
+			//token: token
+			username: username//,
+			//password: password
 		}, 
       // response handler
       function(data) {
@@ -375,8 +421,8 @@
   function list_close() {
 	var usernameField = document.getElementById("username");
 	var username = usernameField.value;
-	var passwordField = document.getElementById("password");
-	var password = passwordField.value;
+	//var passwordField = document.getElementById("password");
+	//var password = passwordField.value;
 	var addition = "";
 	if (document.getElementById("jsonR").checked) {
 		addition = "/json"
@@ -389,7 +435,7 @@
 	$.getJSON(LISTCLOSE_URL + addition, 
 		{ 
 			username: username,
-			password: password,
+			//password: password,
 			top: top
 		}, 
       // response handler
@@ -404,8 +450,8 @@
   function list_open() {
 	var usernameField = document.getElementById("username");
 	var username = usernameField.value;
-	var passwordField = document.getElementById("password");
-	var password = passwordField.value;
+	//var passwordField = document.getElementById("password");
+	//var password = passwordField.value;
 	var addition = "";
 	if (document.getElementById("jsonR").checked) {
 		addition = "/json"
@@ -421,7 +467,7 @@
 	$.getJSON(LISTOPEN_URL + addition, 
 		{ 
 			username: username,
-			password: password,
+			//password: password,
 			top: top
 		}, 
       // response handler

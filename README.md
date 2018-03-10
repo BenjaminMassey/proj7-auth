@@ -18,7 +18,13 @@ for the functions in project 6.
 
 4. Create your credentials.ini file based on credentials-skel.ini
 
-5. Run the program!
+5. Run the program
 
-You can either use basic python (python flask-brevets.py), basic docker (have fun),
-or docker-compose (docker-compose up)
+- Basic Python 
+	- python flask-brevets.py
+- Basic Docker
+	- docker build -t NAME .
+- Docker-Compose
+	- docker-compose up
+	
+6. Go to the webpage (defined by your machine ip and your config port) and have fun!

@@ -5,14 +5,17 @@ Replacement for RUSA ACP brevet time calculator
 """
 
 import flask
-from flask import request
+from flask import request, session
 from pymongo import MongoClient
 import arrow  # Replacement for datetime, based on moment.js
 import acp_times  # Brevet time calculations
 import config
 import sys
 import datetime
-import testToken
+
+from itsdangerous import (TimedJSONWebSignatureSerializer \
+                                  as Serializer, BadSignature, \
+                                  SignatureExpired)
 
 import logging
 import password
@@ -28,6 +31,41 @@ client = MongoClient(CONFIG.MONGO_URL)
 db = client.get_default_database()
 collection = db['times']
 usersCollection = db['users']
+
+
+###
+# Verification Functions
+###
+
+def generate_auth_token(expiration, userID):
+   s = Serializer(app.secret_key, expires_in=expiration)
+   #s = Serializer('test1234@#$', expires_in=expiration)
+   # pass index of user
+   #return s.dumps({'id': 1})
+   return s.dumps({'id': str(userID)})
+
+def verify_auth_token(token):
+    s = Serializer(app.secret_key)
+    try:
+        data = s.loads(token)
+    except SignatureExpired:
+        return None    # valid token, but expired
+    except BadSignature:
+        return None    # invalid token
+    return "Success"
+
+def verifyPassword(username, passwordRAW):
+    pwHASH = None
+    data = usersCollection.find()
+    for datum in data:
+        if datum['username'] == username:
+            pwHASH = datum['password']
+    if pwHASH == None:
+        return False
+    if password.verify_password(passwordRAW, pwHASH):
+        return True
+    else:
+        return False
 
 ###
 # Pages
@@ -91,19 +129,6 @@ def _calc_times():
     return flask.jsonify(result=result)
 
 
-def verifyPassword(username, passwordRAW):
-    pwHASH = None
-    data = usersCollection.find()
-    for datum in data:
-        if datum['username'] == username:
-            pwHASH = datum['password']
-    if pwHASH == None:
-        return False
-    if password.verify_password(passwordRAW, pwHASH):
-        return True
-    else:
-        return False
-
 @app.route("/_submit_DB")
 def _submit_DB():
     collection.delete_many({}) # Clear entire collection
@@ -152,9 +177,9 @@ def _load_DB():
 @app.route("/listAll")
 def listAll():
     username = request.args.get('username', "", type=str)
-    rawPassword = request.args.get('password', "", type=str)
-    verified = verifyPassword(username, rawPassword)
-    if verified:
+    token = session['token']
+    verified = verify_auth_token(token);
+    if verified == "Success":
         data = collection.find()
         opens = []
         closes = []
@@ -171,16 +196,16 @@ def listAll():
         html += "}</p></body></html>"
         return flask.jsonify(result={"result":html})
     else:
-        return flask.jsonify(result={"result":"<html>Cannot verify your credentials, please try again!</html>"})
+        return flask.jsonify(result={"result":"<html>401: Cannot verify your credentials, please try again!</html>"})
 
 
 @app.route("/listOpenOnly/json")
 @app.route("/listOpenOnly")
 def listOpenOnly():
     username = request.args.get('username', "", type=str)
-    rawPassword = request.args.get('password', "", type=str)
-    verified = verifyPassword(username, rawPassword)
-    if verified:
+    token = session['token']
+    verified = verify_auth_token(token);
+    if verified == "Success":
         k = request.args.get('top', default = "999", type = str)
         if len(k) > 0:
             k = int(k)
@@ -205,15 +230,15 @@ def listOpenOnly():
         html += "}</p></body></html>"
         return flask.jsonify(result={"result":html})
     else:
-        return flask.jsonify(result={"result":"<html>Cannot verify your credentials, please try again!</html>"})
+        return flask.jsonify(result={"result":"<html>401: Cannot verify your credentials, please try again!</html>"})
 
 @app.route("/listCloseOnly/json")
 @app.route("/listCloseOnly")
 def listCloseOnly():
     username = request.args.get('username', "", type=str)
-    rawPassword = request.args.get('password', "", type=str)
-    verified = verifyPassword(username, rawPassword)
-    if verified:
+    token = session['token']
+    verified = verify_auth_token(token);
+    if verified == "Success":
         k = request.args.get('top', default = "999", type = str)
         if len(k) > 0:
             k = int(k)
@@ -238,14 +263,14 @@ def listCloseOnly():
         html += "}</p></body></html>"
         return flask.jsonify(result={"result":html})
     else:
-        return flask.jsonify(result={"result":"<html>Cannot verify your credentials, please try again!</html>"})
+        return flask.jsonify(result={"result":"<html>401: Cannot verify your credentials, please try again!</html>"})
 
 @app.route("/listAll/csv")
 def listAllCSV():
     username = request.args.get('username', "", type=str)
-    rawPassword = request.args.get('password', "", type=str)
-    verified = verifyPassword(username, rawPassword)
-    if verified:
+    token = session['token']
+    verified = verify_auth_token(token);
+    if verified == "Success":
         data = collection.find()
         opens = []
         closes = []
@@ -259,14 +284,14 @@ def listAllCSV():
         html += "</p></body></html>"
         return flask.jsonify(result={"result":html})
     else:
-        return flask.jsonify(result={"result":"<html>Cannot verify your credentials, please try again!</html>"})
+        return flask.jsonify(result={"result":"<html>401: Cannot verify your credentials, please try again!</html>"})
 
 @app.route("/listOpenOnly/csv")
 def listOpenOnlyCSV():
     username = request.args.get('username', "", type=str)
-    rawPassword = request.args.get('password', "", type=str)
-    verified = verifyPassword(username, rawPassword)
-    if verified:
+    token = session['token']
+    verified = verify_auth_token(token);
+    if verified == "Success":
         k = request.args.get('top', default = "999", type = str)
         if len(k) > 0:
             k = int(k)
@@ -288,14 +313,14 @@ def listOpenOnlyCSV():
         html += "</p></body></html>"
         return flask.jsonify(result={"result":html})
     else:
-        return flask.jsonify(result={"result":"<html>Cannot verify your credentials, please try again!</html>"})
+        return flask.jsonify(result={"result":"<html>401: Cannot verify your credentials, please try again!</html>"})
 
 @app.route("/listCloseOnly/csv")
 def listCloseOnlyCSV():
     username = request.args.get('username', "", type=str)
-    rawPassword = request.args.get('password', "", type=str)
-    verified = verifyPassword(username, rawPassword)
-    if verified:
+    token = session['token']
+    verified = verify_auth_token(token);
+    if verified == "Success":
         k = request.args.get('top', default = "999", type = str)
         if len(k) > 0:
             k = int(k)
@@ -317,7 +342,7 @@ def listCloseOnlyCSV():
         html += "</p></body></html>"
         return flask.jsonify(result={"result":html})
     else:
-        return flask.jsonify(result={"result":"<html>Cannot verify your credentials, please try again!</html>"})
+        return flask.jsonify(result={"result":"<html>401: Cannot verify your credentials, please try again!</html>"})
 
 
 @app.route("/api/register")
@@ -327,7 +352,7 @@ def registerUser():
     data = usersCollection.find()
     for datum in data:
         if datum['username'] == un:
-            result = {"location": "", "username": "", "password": "", "message": "Username '"+un+"' is already taken."}
+            result = {"location": "", "username": "", "password": "", "message": "400: Username '"+un+"' is already taken."}
             return flask.jsonify(result=result)#, 400
     pw = password.hash_password(pwRAW)
     usersCollection.insert({"username":un, "password":pw})
@@ -336,37 +361,51 @@ def registerUser():
     for datum in data:
         ids.append(datum['_id'])
     location = str(ids[len(ids) - 1])
+    token = generate_auth_token(600, location)
+    session['token'] = token
     result = {"location": location, "username": un, "password": pw, "message": ""}
-    return flask.jsonify(result=result)#, 201
-##    return '<html><body><p>{</br></br>&emsp;{</br>&emsp;&emsp;"id": "' + \
-##           location  + '"</br>&emsp;},</br></br>&emsp;{</br>&emsp;&emsp;"username": "' + \
-##           un + '"</br>&emsp;},</br></br>&emsp;{</br>&emsp;&emsp;"password": "' + \
-##           pw + '"</br>&emsp;}</br></br>}</p></body></html>', 201
+    return flask.jsonify(result=result), 201
 
 @app.route("/api/token")
+def testAuthToken():
+    un = request.args.get('username', default = "", type = str)
+    pwRAW = request.args.get('password', default = "", type = str)
+    verified = verifyPassword(un, pwRAW)
+    if verified:
+        dur = 600
+        token = generate_auth_token(600, "dummy")
+        if verify_auth_token(token) == "Success":
+            result = {"token": str(token), "duration": str(dur), "message": ""}
+            return flask.jsonify(result=result), 201
+        else:
+            result = {"token": "", "duration": "", "message": "401: Sorry, but the token failed to verify!"}
+            return flask.jsonify(result=result)#, 401
+    else:
+        result = {"token": "", "duration": "", "message": "401: Sorry, but that password is wrong!"}
+        return flask.jsonify(result=result)#, 401
+
+@app.route("/api/token/receive")
 def getToken():
     un = request.args.get('username', default = "", type = str)
     pwRAW = request.args.get('password', default = "", type = str)
     verified = verifyPassword(un, pwRAW)
-##    if pwHASH == None:
-##        result = {"token": "", "duration": "", "message": "Sorry, but username '"+un+"' is not recognized."}
-##        return flask.jsonify(result=result)#, 401
     if verified:
-        dur = 600
-        token = testToken.generate_auth_token(600)
-        if testToken.verify_auth_token(token) == "Success":
-            result = {"token": str(token), "duration": str(dur), "message": ""}
-            return flask.jsonify(result=result)#, 201
-##            return '<html><body><p>{</br></br>&emsp;{</br>&emsp;&emsp;"token": "' + \
-##                   str(token)  + '"</br>&emsp;},</br></br>&emsp;{</br>&emsp;&emsp;"duration": ' + \
-##                   str(dur) + '</br>&emsp;}</br></br>}</p></body></html>', 201
+        userID = ""
+        data = usersCollection.find()
+        for datum in data:
+            if datum['username'] == un:
+                userID = datum['_id']
+        if userID == "":
+            print("ruh roh", file=sys.stderr)
+            result = {"success":"no"}
         else:
-            result = {"token": "", "duration": "", "message": "Sorry, but the token failed to verify!"}
-            return flask.jsonify(result=result)#, 401
+            token = generate_auth_token(600, userID)
+            session['token'] = token
+            result = {"success":"yes"}
     else:
-        result = {"token": "", "duration": "", "message": "Sorry, but that password is wrong!"}
-        return flask.jsonify(result=result)#, 401
-    
+        result = {"success":"no"}
+    return flask.jsonify(result=result)
+
 #############
 
 app.debug = CONFIG.DEBUG
